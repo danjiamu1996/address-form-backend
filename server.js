@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
+const cors = require('cors');  // 引入 cors 中间件
 
 // 连接 MongoDB 数据库
 mongoose.connect('mongodb://localhost:27017/address_db')
@@ -25,6 +26,9 @@ const Submission = mongoose.model('Submission', submissionSchema);
 
 const app = express();
 app.use(bodyParser.json());
+
+// 使用 CORS 中间件，允许任何来源的跨域请求
+app.use(cors());  // 这一行允许任何来源的请求
 
 // 提交用户信息的 API
 app.post('/submit', async (req, res) => {
