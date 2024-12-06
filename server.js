@@ -19,7 +19,8 @@ const submissionSchema = new mongoose.Schema({
   phone: String,
   remark: String,
   createdAt: { type: Date, default: Date.now },
-  isUpdated: { type: Boolean, default: false }  // 新增字段：标识是否是已更新订单
+  isUpdated: { type: Boolean, default: false },  // 新增字段：标识是否是已更新订单
+	amount: String // 新增字段：订单金额
 });
 
 const Submission = mongoose.model('Submission', submissionSchema);
@@ -32,7 +33,7 @@ app.use(cors());  // 这一行允许任何来源的请求
 
 // 提交用户信息的 API
 app.post('/submit', async (req, res) => {
-  const { address, name, phone, remark } = req.body;
+  const { address, name, phone, remark, amount } = req.body;
 
   // 获取当前日期（不包括时间部分）
   const currentDate = new Date();
@@ -50,6 +51,7 @@ app.post('/submit', async (req, res) => {
       existingSubmission.address = address;
       existingSubmission.name = name;
       existingSubmission.remark = remark;
+			existingSubmission.amount = amount; // 更新金额
       existingSubmission.createdAt = new Date();  // 更新时间戳
       existingSubmission.isUpdated = true;  // 标记为已更新
 
@@ -57,7 +59,7 @@ app.post('/submit', async (req, res) => {
       res.status(200).json({ message: '订单已更新', isUpdated: true });
     } else {
       // 如果不存在，创建新的订单
-      const submission = new Submission({ address, name, phone, remark });
+      const submission = new Submission({ address, name, phone, remark, amount });
       await submission.save();
       res.status(200).json({ message: '提交成功', isUpdated: false });
     }
@@ -65,6 +67,38 @@ app.post('/submit', async (req, res) => {
     res.status(500).json({ message: '提交失败', error: err });
   }
 });
+
+// 修改订单接口
+app.put('/update-order/:id', async (req, res) => {
+  const { id } = req.params; // 获取订单ID
+  const { address, name, phone, remark, amount } = req.body; // 获取需要更新的字段
+
+  try {
+    // 查找订单并更新字段
+    const updatedOrder = await Submission.findByIdAndUpdate(
+      id, 
+      { 
+        address, 
+        name, 
+        phone, 
+        remark, 
+        amount,
+        isUpdated: true, // 标记为已更新
+        createdAt: new Date() // 更新时间戳
+      },
+      { new: true } // 返回更新后的数据
+    );
+
+    if (updatedOrder) {
+      res.status(200).json({ code: 200, message: '订单更新成功', data: updatedOrder });
+    } else {
+      res.status(404).json({ code: 201, message: '未找到该订单' });
+    }
+  } catch (error) {
+    res.status(500).json({ code: 202, message: '更新订单失败', error });
+  }
+});
+
 
 // 获取所有提交信息的 API，按日期分组，并按时间倒序排列
 app.get('/submissions', async (req, res) => {
@@ -79,6 +113,7 @@ app.get('/submissions', async (req, res) => {
           remark: 1,
           createdAt: 1,
           isUpdated: 1,  // 包含isUpdated字段
+					amount: 1, // 包含金额字段
           date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } } // 格式化日期，按天分组
         }
       },
