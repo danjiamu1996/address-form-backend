@@ -51,9 +51,9 @@ app.post('/submit', async (req, res) => {
       existingSubmission.address = address;
       existingSubmission.name = name;
       existingSubmission.remark = remark;
-			existingSubmission.amount = amount; // 更新金额
       existingSubmission.createdAt = new Date();  // 更新时间戳
       existingSubmission.isUpdated = true;  // 标记为已更新
+			existingSubmission.amount = amount; // 更新金额
 
       await existingSubmission.save();
       res.status(200).json({ message: '订单已更新', isUpdated: true });
@@ -82,9 +82,9 @@ app.put('/update-order/:id', async (req, res) => {
         name, 
         phone, 
         remark, 
-        amount,
         isUpdated: true, // 标记为已更新
-        createdAt: new Date() // 更新时间戳
+        createdAt: new Date(), // 更新时间戳
+        amount
       },
       { new: true } // 返回更新后的数据
     );
