@@ -3,7 +3,7 @@ const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 
 // 连接 MongoDB 数据库
-mongoose.connect('mongodb://localhost:27017/address_db')
+mongoose.connect('mongodb://127.0.0.1:27017/test')
   .then(() => {
     console.log('MongoDB连接成功');
   })
@@ -28,6 +28,7 @@ app.use(bodyParser.json());
 
 // 提交用户信息的 API
 app.post('/submit', async (req, res) => {
+  console.log('用户提交数据=====>',req.bod)
   const { address, name, phone, remark } = req.body;
 
   // 获取当前日期（不包括时间部分）
