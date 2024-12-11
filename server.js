@@ -100,10 +100,11 @@ app.put('/update-order/:id', async (req, res) => {
 });
 
 
-// 获取所有提交信息的 API，按日期分组，并按时间倒序排列
+// 获取所有提交信息的 API，按日期分组，并按时间倒序排列 支持按日期分组的分页
 app.get('/submissions', async (req, res) => {
+  const { page = 1, limit = 10 } = req.query; // 从请求参数中获取分页参数，默认第一页，每页10条
+
   try {
-    // 获取所有提交记录，并按日期进行分组，同时每个日期组内按提交时间倒序排列
     const submissions = await Submission.aggregate([
       {
         $project: {
@@ -112,26 +113,57 @@ app.get('/submissions', async (req, res) => {
           phone: 1,
           remark: 1,
           createdAt: 1,
-          isUpdated: 1,  // 包含isUpdated字段
-					amount: 1, // 包含金额字段
+          isUpdated: 1, // 包含isUpdated字段
+          amount: 1, // 包含金额字段
           date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } } // 格式化日期，按天分组
         }
       },
       { $group: { _id: "$date", list: { $push: "$$ROOT" } } }, // 按日期分组，并将订单放入 list 数组
-      { $sort: { _id: -1 } }, // 按日期倒序排列
-      {
-        $project: {
-          date: "$_id", // 将 _id 改为 date 字段
-          list: { $reverseArray: "$list" } // 每个日期组内按时间倒序排列
-        }
-      }
+      { $sort: { _id: -1 } } // 按日期倒序排列
     ]);
 
-    // 发送响应数据
+    // 将所有数据线性展平并记录分组索引
+    const flattened = [];
+    submissions.forEach((group) => {
+      group.list.forEach((item) => {
+        flattened.push({ ...item, groupDate: group._id });
+      });
+    });
+
+    // 实现分页逻辑
+    const startIndex = (page - 1) * limit; // 当前页起始索引
+    const endIndex = startIndex + parseInt(limit); // 当前页结束索引
+    const pageData = flattened.slice(startIndex, endIndex);
+
+    // 将数据重新按日期分组
+    const groupedData = {};
+    pageData.forEach((item) => {
+      if (!groupedData[item.groupDate]) {
+        groupedData[item.groupDate] = [];
+      }
+      groupedData[item.groupDate].push(item);
+    });
+
+    // 格式化返回结果
+    const formattedSubmissions = Object.entries(groupedData).map(([date, list]) => ({
+      date,
+      list: list.reverse(), // 每组内按时间倒序排列
+    }));
+
+    // 查询总记录数和计算总页数
+    const totalRecords = flattened.length;
+    const totalPages = Math.ceil(totalRecords / limit);
+
+    // 返回分页数据
     res.status(200).json({
       code: 200,
       message: '请求成功',
-      data: { submissions }
+      data: {
+        submissions: formattedSubmissions,
+        totalPages,
+        currentPage: parseInt(page),
+        totalRecords
+      }
     });
   } catch (err) {
     res.status(500).json({ code: 500, message: '获取数据失败', error: err });
@@ -153,6 +185,25 @@ app.delete('/delete-order/:id', async (req, res) => {
     res.status(500).json({ code: 202, message: '删除订单失败', error });
   }
 });
+
+// 定义一个全局变量用来控制页面 UI 的开关状态
+let isUIEnabled = false;
+
+// 新增一个接口，用于获取 UI 状态
+app.get('/ui-status', (req, res) => {
+  res.status(200).json({ code: 200, message: '状态获取成功', data: { isUIEnabled } });
+});
+
+// 新增一个接口，用于设置 UI 状态
+app.post('/toggle-ui', (req, res) => {
+  const { enable } = req.body; // 从请求体中获取开关状态
+  if (typeof enable !== 'boolean') {
+    return res.status(400).json({ code: 400, message: '参数无效，请传递布尔值' });
+  }
+  isUIEnabled = enable; // 更新全局变量
+  res.status(200).json({ code: 200, message: 'UI 状态更新成功', data: { isUIEnabled } });
+});
+
 
 // 启动服务器
 app.listen(3000, () => {
